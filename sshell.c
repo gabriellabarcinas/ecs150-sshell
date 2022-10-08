@@ -2,39 +2,46 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <sys/types.h>
+#include <sys/wait.h>
 
 #define CMDLINE_MAX 512
 
-void parsecmd(char cmd[], char* args[]) {
+void parsecmd(char cmd[], char* argv[]) {
         char *arg;
         int i = 0;
 
         arg = strtok(cmd, " "); 
 
         while (arg != NULL){
-                printf(" %s\n", arg);
-                args[i] = arg;
+                argv[i] = arg;
                 i++;
                 arg = strtok(NULL, " ");
         } 
+        argv[i] = NULL;
 }
 
 // fork - execute - wait
 int run(char cmd[]) {
-
-//        pid_t pid;
-       char* args[CMDLINE_MAX];
+       pid_t pid;
+       int status;
+       char* argv[CMDLINE_MAX];
        
-       parsecmd(cmd, args); 
+       parsecmd(cmd, argv); 
        
-       if(fork() == 0) { // Child Process
-                execvp(command, );
+       pid = fork();
+       if(pid == 0) { // Child Process
+                execvp(argv[0], argv);
                 perror("execv");
                 exit(1);
-       } else { // Parent Process
-                wait
+       } else if (pid > 0) { // Parent Process
+                waitpid(pid, &status, 0);
+                // printf("Child returned %d\n", WEXITSTATUS(status));
+       } else { // If fork failed
+                perror("fork");
+                exit(1);
        }
-        return 0;
+       return WEXITSTATUS(status);
 }
 
 int main(void)
@@ -71,7 +78,7 @@ int main(void)
 
                 /* Regular command */
                 retval = run(cmd);
-                fprintf(stdout, "Return status value for '%s': %d\n",
+                fprintf(stderr, "Return status value for '%s': %d\n",
                         cmd, retval);
         }
         return EXIT_SUCCESS;
