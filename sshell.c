@@ -7,45 +7,50 @@
 
 #define CMDLINE_MAX 512
 
-void parsecmd(char cmd[], char* argv[]) {
+struct cmd {
+        char type[50]; // pwd, cd, echo, date, etc.
+        char* argv[CMDLINE_MAX];
+} cmd1;
+
+void parsecmd(char cmd[]) {
         const char delimiters[] = " \t\r\n\v\f";
-        char *arg;
+        char *token;
         int i = 0;
 
-        arg = strtok(cmd, delimiters); 
+        token = strtok(cmd, delimiters); 
+        strcpy(cmd1.type, token);
+        // printf("cmd type: %s\n", cmd1.type);
 
-        while (arg != NULL){
-                argv[i] = arg;
+        while (token != NULL) {
+                cmd1.argv[i] = token;
+                // printf("argv[%d] = %s\n", i, cmd1.argv[i]);
                 i++;
-                arg = strtok(NULL, delimiters);
+                token = strtok(NULL, delimiters);
         } 
-        argv[i] = NULL;
+        cmd1.argv[i] = NULL;
 }
 
 // fork - execute - wait cmd
 int run(char cmd[]) {
        pid_t pid;
        int status;
-       char* argv[CMDLINE_MAX];
        char cmdcopy[CMDLINE_MAX];
        
-       parsecmd(strcpy(cmdcopy,cmd), argv);
+       parsecmd(strcpy(cmdcopy,cmd));
 
        pid = fork();
        if(pid == 0) { // Child Process
-                execvp(argv[0], argv);
+                execvp(cmd1.type, cmd1.argv);
                 perror("execv");
                 exit(1);
        } else if (pid > 0) { // Parent Process
                 waitpid(pid, &status, 0);
-                // printf("Child returned %d\n", WEXITSTATUS(status));
        } else { // If fork failed
                 perror("fork");
                 exit(1);
        }
        return WEXITSTATUS(status);
 }
-
 
 int main(void)
 {
@@ -56,7 +61,7 @@ int main(void)
                 int retval;
 
                 /* Print prompt */
-                printf("sshell$ ");
+                printf("sshell@ucd$ ");
                 fflush(stdout);
 
                 /* Get command line */
