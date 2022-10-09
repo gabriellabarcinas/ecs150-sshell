@@ -8,27 +8,29 @@
 #define CMDLINE_MAX 512
 
 void parsecmd(char cmd[], char* argv[]) {
+        const char delimiters[] = " \t\r\n\v\f";
         char *arg;
         int i = 0;
 
-        arg = strtok(cmd, " "); 
+        arg = strtok(cmd, delimiters); 
 
         while (arg != NULL){
                 argv[i] = arg;
                 i++;
-                arg = strtok(NULL, " ");
+                arg = strtok(NULL, delimiters);
         } 
         argv[i] = NULL;
 }
 
-// fork - execute - wait
+// fork - execute - wait cmd
 int run(char cmd[]) {
        pid_t pid;
        int status;
        char* argv[CMDLINE_MAX];
+       char cmdcopy[CMDLINE_MAX];
        
-       parsecmd(cmd, argv); 
-       
+       parsecmd(strcpy(cmdcopy,cmd), argv);
+
        pid = fork();
        if(pid == 0) { // Child Process
                 execvp(argv[0], argv);
@@ -43,6 +45,7 @@ int run(char cmd[]) {
        }
        return WEXITSTATUS(status);
 }
+
 
 int main(void)
 {
@@ -78,7 +81,7 @@ int main(void)
 
                 /* Regular command */
                 retval = run(cmd);
-                fprintf(stderr, "Return status value for '%s': %d\n",
+                fprintf(stderr, "+ completed '%s' [%d]\n",
                         cmd, retval);
         }
         return EXIT_SUCCESS;
