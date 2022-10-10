@@ -34,8 +34,8 @@ void parseCmd(char cmd[]) {
 with exec while the parent process waits until the child process has completed and the parent is able to
 collect its exit status
  */
-int execCmd() {
-
+int execute() {
+    
     pid_t pid;
     int status;
 
@@ -123,12 +123,12 @@ int main(void)
         }
         /* Regular command */
         else{
-            retval = execCmd(cmd1.type);
+            retval = execute(cmd1.type);
         }
         fprintf(stderr, "+ completed '%s' [%d]\n",
                 cmd, retval);
 
-
+                       
     return EXIT_SUCCESS;
     }
 }
