@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <limits.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 
@@ -12,18 +13,16 @@ struct cmd {
         char* argv[CMDLINE_MAX];
 } cmd1;
 
-void parsecmd(char cmd[]) {
+void parsecmd(char cmdcopy[]) {
         const char delimiters[] = " \t\r\n\v\f";
         char *token;
         int i = 0;
 
-        token = strtok(cmd, delimiters); 
+        token = strtok(cmdcopy, delimiters); 
         strcpy(cmd1.type, token);
-        // printf("cmd type: %s\n", cmd1.type);
 
         while (token != NULL) {
                 cmd1.argv[i] = token;
-                // printf("argv[%d] = %s\n", i, cmd1.argv[i]);
                 i++;
                 token = strtok(NULL, delimiters);
         } 
@@ -31,12 +30,9 @@ void parsecmd(char cmd[]) {
 }
 
 // fork - execute - wait cmd
-int run(char cmd[]) {
+int run() {
        pid_t pid;
        int status;
-       char cmdcopy[CMDLINE_MAX];
-       
-       parsecmd(strcpy(cmdcopy,cmd));
 
        pid = fork();
        if(pid == 0) { // Child Process
@@ -59,6 +55,7 @@ int main(void)
         while (1) {
                 char *nl;
                 int retval;
+                char cmdcopy[CMDLINE_MAX];
 
                 /* Print prompt */
                 printf("sshell@ucd$ ");
@@ -78,18 +75,26 @@ int main(void)
                 if (nl)
                         *nl = '\0';
 
+                /* Parse command line */
+                parsecmd(strcpy(cmdcopy,cmd));
+
                 /* Builtin command */
-                if (!strcmp(cmd, "exit")) {
+                if (!strcmp(cmd1.type, "exit")) {
                         fprintf(stderr, "Bye...\n");
                         break;
+                } else if (!strcmp(cmd1.type, "pwd")) {
+                        char cwd[PATH_MAX];
+                        getcwd(cwd, sizeof(cwd));
+                        fprintf(stderr, "%s\n", cwd);
+                        retval = 0;
+                } else if (!strcmp(cmd1.type, "cd")) {
+                        retval = chdir(cmd1.argv[1]);
+                } else { /* Regular command */
+                     retval = run();   
                 }
 
-                /* Regular command */
-                retval = run(cmd);
                 fprintf(stderr, "+ completed '%s' [%d]\n",
                         cmd, retval);
         }
         return EXIT_SUCCESS;
 }
-
-
