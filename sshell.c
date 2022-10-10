@@ -127,8 +127,6 @@ int main(void)
         }
         fprintf(stderr, "+ completed '%s' [%d]\n",
                 cmd, retval);
-
-                       
-    return EXIT_SUCCESS;
     }
+    return EXIT_SUCCESS;
 }
