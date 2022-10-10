@@ -110,11 +110,11 @@ int main(void)
         /* Builtin command */
         // PWD
         if (!strcmp(cmd1.type, "pwd")){
-            retval = pwdCmd(cmd1.type);
+            retval = pwdCmd();
         }
         // CD
         else if (!strcmp(cmd1.type, "cd")){
-            retval = cdCmd(cmd1.type);
+            retval = cdCmd();
         }
         // Exit
         else if (!strcmp(cmd1.type, "exit")) {
@@ -123,7 +123,7 @@ int main(void)
         }
         /* Regular command */
         else{
-            retval = execute(cmd1.type);
+            retval = execute();
         }
         fprintf(stderr, "+ completed '%s' [%d]\n",
                 cmd, retval);
