@@ -8,35 +8,51 @@
 
 #define CMDLINE_MAX 512
 
-struct cmd {
+struct cmd
+{
         char type[50]; // pwd, cd, echo, date, etc.
         char* argv[CMDLINE_MAX];
-} cmd1;
+        struct cmd *next;      
+};
 
-void parsecmd(char cmdcopy[]) {
+struct cmd* parsecmd(struct cmd* cmd, char cmdString[])
+{
         const char delimiters[] = " \t\r\n\v\f";
         char *token;
         int i = 0;
 
-        token = strtok(cmdcopy, delimiters); 
-        strcpy(cmd1.type, token);
+        token = strtok(cmdString, delimiters); 
+        strcpy(cmd->type, token);
 
         while (token != NULL) {
-                cmd1.argv[i] = token;
+                if (!strcmp(token, "|")){
+                        i++;
+                        cmd->argv[i] = NULL;
+                        token = strtok(NULL, "|");
+                        printf("Next command: %s\n", token);
+                        struct cmd *next = (struct cmd*) malloc(sizeof(struct cmd));
+                        cmd->next = next;
+                        parsecmd(next, token);
+                }
+                cmd->argv[i] = token;
                 i++;
                 token = strtok(NULL, delimiters);
         } 
-        cmd1.argv[i] = NULL;
+        cmd->argv[i] = NULL;
+        cmd->next = NULL;
+
+        return cmd;
 }
 
 // fork - execute - wait cmd
-int run() {
+int run(struct cmd *cmd) 
+{
        pid_t pid;
        int status;
 
        pid = fork();
        if(pid == 0) { // Child Process
-                execvp(cmd1.type, cmd1.argv);
+                execvp(cmd->type, cmd->argv);
                 perror("execv");
                 exit(1);
        } else if (pid > 0) { // Parent Process
@@ -48,9 +64,50 @@ int run() {
        return WEXITSTATUS(status);
 }
 
+// Builtin Command - Print Working Directory (pwd)
+int runpwd()
+{
+    char cwd[PATH_MAX];
+    if (getcwd(cwd, sizeof(cwd)) == NULL) {
+        perror("Error:");
+    }
+    else {
+        fprintf(stderr, "%s\n", cwd);
+    }
+    return 0;
+}
+
+// Builtin Command - Change Directory (cd)
+int runcd(struct cmd *cmd) 
+{
+    int retval = chdir(cmd->argv[1]);    
+    if (retval != 0) {
+        fprintf(stderr, "Error: cannot cd into directory\n");
+        return EXIT_FAILURE;
+    }
+
+    return retval;
+}
+
+// Pipe
+// void runpipe() {
+//         pid_t pid;
+//         int pipe[cmd1.numargs];
+
+// }
+
+// Free allocated memory
+void freeMemory(struct cmd *ptr)
+{
+        while (ptr != NULL) {
+                free(ptr);
+                ptr = ptr->next; 
+        }
+}
 int main(void)
 {
         char cmd[CMDLINE_MAX];
+        struct cmd *cmd1 = (struct cmd*) malloc(sizeof(struct cmd));
 
         while (1) {
                 char *nl;
@@ -76,25 +133,31 @@ int main(void)
                         *nl = '\0';
 
                 /* Parse command line */
-                parsecmd(strcpy(cmdcopy,cmd));
+                parsecmd(cmd1, strcpy(cmdcopy,cmd));
 
                 /* Builtin command */
-                if (!strcmp(cmd1.type, "exit")) {
+                // exit
+                if (!strcmp(cmd1->type, "exit")) {
                         fprintf(stderr, "Bye...\n");
                         break;
-                } else if (!strcmp(cmd1.type, "pwd")) {
-                        char cwd[PATH_MAX];
-                        getcwd(cwd, sizeof(cwd));
-                        fprintf(stderr, "%s\n", cwd);
-                        retval = 0;
-                } else if (!strcmp(cmd1.type, "cd")) {
-                        retval = chdir(cmd1.argv[1]);
-                } else { /* Regular command */
-                     retval = run();   
+                } 
+                // pwd
+                else if (!strcmp(cmd1->type, "pwd")) {
+                        retval = runpwd();
+                } 
+                // cd
+                else if (!strcmp(cmd1->type, "cd")) {
+                        retval = runcd(cmd1);
+                }
+                /* Regular command */
+                else { 
+                     retval = run(cmd1);   
                 }
 
                 fprintf(stderr, "+ completed '%s' [%d]\n",
                         cmd, retval);
         }
+        
+        freeMemory(cmd1);
         return EXIT_SUCCESS;
 }
