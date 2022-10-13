@@ -25,11 +25,10 @@ struct cmd* parsecmd(struct cmd* cmd, char cmdString[])
         strcpy(cmd->type, token);
 
         while (token != NULL) {
-                if (!strcmp(token, "|")){
+                if (!strcmp(token, "|")) {
                         i++;
                         cmd->argv[i] = NULL;
                         token = strtok(NULL, "|");
-                        printf("Next command: %s\n", token);
                         struct cmd *next = (struct cmd*) malloc(sizeof(struct cmd));
                         cmd->next = next;
                         parsecmd(next, token);
@@ -39,7 +38,6 @@ struct cmd* parsecmd(struct cmd* cmd, char cmdString[])
                 token = strtok(NULL, delimiters);
         } 
         cmd->argv[i] = NULL;
-        cmd->next = NULL;
 
         return cmd;
 }
@@ -51,7 +49,7 @@ int run(struct cmd *cmd)
        int status;
 
        pid = fork();
-       if(pid == 0) { // Child Process
+       if (pid == 0) { // Child Process
                 execvp(cmd->type, cmd->argv);
                 perror("execv");
                 exit(1);
@@ -89,12 +87,27 @@ int runcd(struct cmd *cmd)
     return retval;
 }
 
-// Pipe
-// void runpipe() {
-//         pid_t pid;
-//         int pipe[cmd1.numargs];
+int* runpipeline(struct cmd *cmd, int numcmds) {
+        int *retvals = (int*) malloc(numcmds * sizeof(int));
+        int fd[2]; 
 
-// }
+        pipe(fd);
+        if (fork() != 0) {
+                close(fd[0]);
+                dup2(fd[1], STDOUT_FILENO);
+                close(fd[1]);
+                retvals[0] = run(cmd);
+                fprintf(stderr, "Parent exit status: %d\n", retvals[0]);
+        } else {
+                close(fd[1]);
+                dup2(fd[0], STDIN_FILENO);
+                close(fd[0]);
+                retvals[1] = run(cmd->next);
+                fprintf(stderr, "Child exit status: %d\n", retvals[0]);
+        }
+
+        return retvals;
+}
 
 // Free allocated memory
 void freeMemory(struct cmd *ptr)
@@ -104,6 +117,19 @@ void freeMemory(struct cmd *ptr)
                 ptr = ptr->next; 
         }
 }
+
+// Count number of commands in pipeline
+int numCmds(struct cmd *cmd)
+{
+        int count = 0;
+        while (cmd != NULL) {
+                count++;
+                cmd = cmd->next;
+        }
+
+        return count;
+}
+
 int main(void)
 {
         char cmd[CMDLINE_MAX];
@@ -129,8 +155,9 @@ int main(void)
                 
                 /* Remove trailing newline from command line */
                 nl = strchr(cmd, '\n');
-                if (nl)
+                if (nl) {
                         *nl = '\0';
+                }
 
                 /* Parse command line */
                 parsecmd(cmd1, strcpy(cmdcopy,cmd));
@@ -149,15 +176,29 @@ int main(void)
                 else if (!strcmp(cmd1->type, "cd")) {
                         retval = runcd(cmd1);
                 }
+                // piping
+                else if (cmd1->next != NULL) {
+                        fprintf(stderr, "Piping...\n");
+                        int numcmds = numCmds(cmd1);
+                        int *retvals = runpipeline(cmd1, numcmds);
+                        fprintf(stderr, "+ completed '%s' ", cmd);
+                        // for (int i = 0; i < numcmds; i++) {
+                        //         fprintf(stderr, "[%d]", retvals[i]);
+                        // }
+                        fprintf(stderr, "\n");
+                        free(retvals);
+                        break;
+                }
                 /* Regular command */
-                else { 
-                     retval = run(cmd1);   
+                else {
+                        retval = run(cmd1);   
                 }
 
                 fprintf(stderr, "+ completed '%s' [%d]\n",
                         cmd, retval);
-        }
+      
         
+        }
         freeMemory(cmd1);
         return EXIT_SUCCESS;
 }
