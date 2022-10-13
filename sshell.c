@@ -182,9 +182,9 @@ int main(void)
                         int numcmds = numCmds(cmd1);
                         int *retvals = runpipeline(cmd1, numcmds);
                         fprintf(stderr, "+ completed '%s' ", cmd);
-                        // for (int i = 0; i < numcmds; i++) {
-                        //         fprintf(stderr, "[%d]", retvals[i]);
-                        // }
+                        for (int i = 0; i < numcmds; i++) {
+                                fprintf(stderr, "[%d]", retvals[i]);
+                        }
                         fprintf(stderr, "\n");
                         free(retvals);
                         break;
