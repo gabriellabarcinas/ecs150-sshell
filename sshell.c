@@ -87,8 +87,7 @@ int runcd(struct cmd *cmd)
     return retval;
 }
 
-int* runpipeline(struct cmd *cmd, int numcmds) {
-        int *retvals = (int*) malloc(numcmds * sizeof(int));
+int* runpipeline(struct cmd *cmd, int retvals[]) {
         int fd[2]; 
 
         pipe(fd);
@@ -103,7 +102,7 @@ int* runpipeline(struct cmd *cmd, int numcmds) {
                 dup2(fd[0], STDIN_FILENO);
                 close(fd[0]);
                 retvals[1] = run(cmd->next);
-                fprintf(stderr, "Child exit status: %d\n", retvals[0]);
+                fprintf(stderr, "Child exit status: %d\n", retvals[1]);
         }
 
         return retvals;
@@ -180,13 +179,13 @@ int main(void)
                 else if (cmd1->next != NULL) {
                         fprintf(stderr, "Piping...\n");
                         int numcmds = numCmds(cmd1);
-                        int *retvals = runpipeline(cmd1, numcmds);
+                        int retvals[numcmds];
+                        runpipeline(cmd1, retvals);
                         fprintf(stderr, "+ completed '%s' ", cmd);
                         for (int i = 0; i < numcmds; i++) {
                                 fprintf(stderr, "[%d]", retvals[i]);
                         }
                         fprintf(stderr, "\n");
-                        free(retvals);
                         break;
                 }
                 /* Regular command */
@@ -197,7 +196,6 @@ int main(void)
                 fprintf(stderr, "+ completed '%s' [%d]\n",
                         cmd, retval);
       
-        
         }
         freeMemory(cmd1);
         return EXIT_SUCCESS;
