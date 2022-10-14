@@ -213,6 +213,7 @@ int dirsCmd(){
     return 0;
 }
 
+// Error Management
 int iserror(char *cmd, char *filename) {
 
     if (cmd == NULL) {
