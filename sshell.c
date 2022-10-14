@@ -77,7 +77,7 @@ int run(struct cmd *cmd)
        if (pid == 0) { // Child Process
                 execvp(cmd->argv[0], cmd->argv);
                 // perror("execv");
-                perror("Error: command not found");
+                fprintf(stderr, "Error: command not found");
                 exit(1);
        } else if (pid > 0) { // Parent Process
                 waitpid(pid, &status, 0);
@@ -150,7 +150,7 @@ void runpipeline(struct cmd *cmd, int numcmds, int retvals[])
                                 close(fd[i-1][0]);
                         }
                         execvp(currCmd->argv[0], currCmd->argv);
-                        perror("Error: command not found");
+                        fprintf(stderr, "Error: command not found");
                         exit(1);
                 } if (childpid[i] < 0) {
                         perror("fork failed");
