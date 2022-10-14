@@ -247,7 +247,7 @@ int outRedirection(char cmdString[], struct cmd *cmd)
     //Child process
     if ((pid = fork()) == 0) {
         close(STDOUT_FILENO);
-        int fdOut = open(filename, O_WRONLY | O_TRUNC | O_CREAT);
+        int fdOut = open(filename, O_WRONLY | O_TRUNC | O_CREAT, 0644);
         if (fdOut == -1) {
             fprintf(stderr, "Error: cannot open output file\n");
             return 1;
