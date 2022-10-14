@@ -1,90 +1,377 @@
+#include <fcntl.h>
+#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
-#include <limits.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <unistd.h>
 
 #define CMDLINE_MAX 512
 
-struct cmd {
-    char type[50]; // pwd, cd, echo, date, etc.
-    char* argv[CMDLINE_MAX];
-} cmd1;
+#include <fcntl.h>
+#include <limits.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <unistd.h>
 
-void parseCmd(char cmd[]) {
+#define CMDLINE_MAX 512
+
+struct cmd
+{
+    char* argv[CMDLINE_MAX];
+    struct cmd *next;
+};
+
+void mallocFail(struct cmd *cmd)
+{
+    if (cmd == NULL) {
+        perror("malloc failed");
+        exit(1);
+    }
+}
+
+void parseCmd(struct cmd* cmd, char cmdString[])
+{
     const char delimiters[] = " \t\r\n\v\f";
     char *token;
     int i = 0;
 
-    token = strtok(cmd, delimiters);
-    strcpy(cmd1.type, token);
+    token = strtok(cmdString, delimiters);
 
     while (token != NULL) {
-        cmd1.argv[i] = token;
-        i++;
+        cmd->argv[i] = token;
         token = strtok(NULL, delimiters);
+        i++;
     }
-    cmd1.argv[i] = NULL;
+    cmd->argv[i] = NULL;
+
+    if (i+1 > 16) {
+        fprintf(stderr, "Error: too many process arguments");
+    }
 }
 
-// Phase 1: Modify the program to use fork+exec+wait instead of using the function system()
-/* The shell should fork and create a child process; the child process should run the specified command
-with exec while the parent process waits until the child process has completed and the parent is able to
-collect its exit status
- */
-int execute() {
-    
+void parsePipeline(struct cmd* cmd, char cmdString[], int numCmds)
+{
+    struct cmd *currCmd = cmd;
+    char* cmds[numCmds];
+    const char delimeters[] = "|";
+    int i = 0;
+
+    char *token = strtok(cmdString, delimeters);
+
+    while (token != NULL) {
+        cmds[i] = token;
+        token = strtok(NULL, delimeters);
+        i++;
+    }
+
+    for (i = 0; i < numCmds; i++) {
+        parseCmd(currCmd, cmds[i]);
+        struct cmd *next = (struct cmd*) malloc(sizeof(struct cmd));
+        mallocFail(next);
+        next->next = NULL;
+        currCmd->next = next;
+        currCmd = currCmd->next;
+    }
+}
+
+// Stack created to store directories
+// Used by pushd, popd, dirs
+struct stack{
+    char directories;
+    struct stack* next;
+};
+struct stack* top = NULL;
+
+// Push directory into stack
+void push(char path){
+    struct stack *curr = malloc(sizeof(struct stack));
+    curr->directories = path;
+    if (top == NULL) {
+        curr->next = NULL;
+    } else {
+        curr->next = top;
+    }
+    top = curr;
+}
+
+// Pop directory out of stack
+int pop() {
+    struct stack *curr = top;
+    char curr_directories = top->directories;
+    top = top->next;
+    free(curr);
+
+    return curr_directories;
+}
+
+// fork - execute - wait cmd
+int execute(struct cmd *cmd) {
+
     pid_t pid;
     int status;
 
     pid = fork();
     if(pid == 0) { // Child Process
-        execvp(cmd1.type, cmd1.argv);
-        perror("execvp");
+        execvp(cmd->argv[0], cmd->argv);
+        fprintf(stderr, "Error: command not found\n");
         exit(1);
     }
     else if (pid > 0) { // Parent Process
         waitpid(pid, &status, 0);
     }
     else { // If fork fails
-        perror("fork");
+        perror("fork failed");
         exit(1);
     }
     return WEXITSTATUS(status);
 }
 
-// Builtin Command - Print Working Directory (pwd)
+/* Builtin Commands */
+
+// Builtin Command - (pwd)
+// Print Working Directory
 int pwdCmd(){
+
     char cwd [PATH_MAX];
-    if (getcwd(cwd, sizeof(cwd)) == NULL)
+
+    if (getcwd(cwd, sizeof(cwd)) == NULL) {
         perror("Error:");
-    else
+    }
+    else {
         printf("%s\n", cwd);
+    }
     return 0;
 }
 
-// Builtin Command - Change Directory (cd)
-int cdCmd() {
-    if (chdir(cmd1.argv[1]) != 0) {
+// Builtin Command - (cd)
+// Change Directory
+int cdCmd(struct cmd *cmd) {
+
+    int retval = chdir(cmd->argv[1]);
+    if ( retval != 0) {
         fprintf(stderr, "Error: cannot cd into directory\n");
         return EXIT_FAILURE;
     }
-    else{
-        chdir(cmd1.argv[1]);
+
+    return retval;
+}
+
+/* Directory Stack */
+
+// Builtin Command - (pushd)
+// Push current directory to stack before changing directory
+int pushdCmd(struct cmd *cmd) {
+
+    char cwd[PATH_MAX];
+    int retval;
+    retval = chdir(cmd->argv[1]);
+
+    if (getcwd(cwd, sizeof(cwd)) == NULL) {
+        perror("Error:");
+    }
+    else {
+        if (retval != 0) {
+            fprintf(stderr, "Error: no such directory\n");
+            return EXIT_FAILURE;
+        }
+        else {
+            push(cwd);
+        }
+    }
+    return retval;
+}
+
+// Builtin Command - (popd)
+// Pops latest directory that was pushed and changes back to it
+int popdCmd(){
+
+    if (top == NULL){
+        fprintf(stderr, "Error: directory stack empty\n");
+    }
+    else {
+        pop();
+        chdir("..");
     }
     return 0;
+}
+
+// Builtin Command - (dirs)
+// Lists the stack of remembered directories
+int dirsCmd(){
+
+    char cwd [PATH_MAX];
+    getcwd(cwd, sizeof(cwd));
+
+    // Current directory starting first
+    if (top == NULL) {
+        push(cwd);
+        printf("%s\n", cwd);
+
+    }
+    else {
+        struct stack *curr = top;
+        while (curr->next != NULL) {
+            printf("%d/", curr->directories);
+            curr = curr->next;
+        }
+        printf("%d/\n", curr->directories);
+    }
+    return 0;
+}
+
+
+
+// Output Redirection
+int outRedirection(char *fileName, struct cmd *cmd)
+{
+    pid_t pid;
+    int fdOut;
+    pid = fork();
+
+    if (pid == 0) {
+        for (int i = 0; cmd->argv[i] != 0; i++) {
+            {
+                if ((!strcmp(cmd->argv[i], ">"))){
+                    close(STDOUT_FILENO);
+                    fdOut = open(fileName, O_CREAT | O_TRUNC | O_WRONLY, 0644);
+                    dup2(fdOut, STDOUT_FILENO);
+                    execvp(cmd->argv[0], cmd->argv);
+                    close(fdOut);
+                }
+
+            }
+        }
+    }
+    //fprintf(stderr, "Error: missing command");
+    //fprintf(stderr, "Error: no output file");
+    //fprintf(stderr, "Error: cannot open output file");
+    //fprintf(stderr, "Error: mislocated output redirection");
+    return 0;
+}
+
+
+int inRedirection(char *fileName, struct cmd *cmd) {
+    pid_t pid;
+    int fdIn;
+    pid = fork();
+
+    if (pid == 0) {
+        for (int i = 0; cmd->argv[i] != 0; i++) {
+            {
+                if ((!strcmp(cmd->argv[i], "<")))
+                    close(STDIN_FILENO);
+                    fdIn = open(fileName, O_CREAT | O_TRUNC | O_WRONLY, 0644);
+                    dup2(fdIn, STDIN_FILENO);
+                    execvp(cmd->argv[0], cmd->argv);
+                    close(fdIn);
+            }
+        }
+    }
+        //execute(cmd->argv[1]);
+        //fprintf(stderr, "Error: no input file");
+        //fprintf(stderr, "Error: cannot open input file");
+        //fprintf(stderr, "Error: mislocated input redirection");
+    return 0;
+}
+
+void pipeline(struct cmd *cmd, int numcmds, int retvals[]) {
+    int numpipes = numcmds - 1;
+    int fd[numpipes][2];
+    pid_t childpid[numcmds];
+    int status[numcmds];
+    struct cmd *currCmd = cmd;
+    int i;
+
+
+    for (i = 0; i < numpipes; i++) {
+        if (pipe(fd[i]) < 0) {
+            perror("pipe failed");
+            exit(1);
+        }
+    }
+
+    for (i = 0; i < numcmds; i++) {
+        if ((childpid[i] = fork()) == 0) {
+            if (i == 0) {
+                close(fd[i][0]);
+                dup2(fd[i][1], STDOUT_FILENO);
+                close(fd[i][1]);
+            } else if (i == numcmds - 1) {
+                close(fd[i-1][1]);
+                dup2(fd[i-1][0], STDIN_FILENO);
+                close(fd[i-1][0]);
+            } else {
+                close(fd[i][0]);
+                dup2(fd[i][1], STDOUT_FILENO);
+                close(fd[i][1]);
+                close(fd[i-1][1]);
+                dup2(fd[i-1][0], STDIN_FILENO);
+                close(fd[i-1][0]);
+            }
+            execvp(currCmd->argv[0], currCmd->argv);
+            fprintf(stderr, "Error: command not found");
+            exit(1);
+        } if (childpid[i] < 0) {
+            perror("fork failed");
+            exit(1);
+        }
+        if (i != 0) {
+            close(fd[i-1][0]);
+            close(fd[i-1][1]);
+        }
+        if(currCmd->next != NULL) {
+            currCmd = currCmd->next;
+        }
+    }
+
+    for (i = 0; i < numcmds; i++) {
+        waitpid(childpid[i], &status[i], 0);
+        retvals[i] = WEXITSTATUS(status[i]);
+    }
+}
+
+// Free allocated memory
+void freeMemory(struct cmd *ptr)
+{
+    while (ptr != NULL) {
+        free(ptr);
+        ptr = ptr->next;
+    }
+}
+
+int numCmds(char argv[])
+{
+    unsigned i, count = 0;
+
+    for (i = 0; i < strlen(argv); i++) {
+        if (argv[i] == '|') {
+            count++;
+        }
+    }
+    return count + 1;
+}
+
+void printCompletionStatus(char cmd[], int retval)
+{
+    fprintf(stderr, "+ completed '%s' [%d]\n",
+            cmd, retval);
 }
 
 int main(void)
 {
     char cmd[CMDLINE_MAX];
+    struct cmd *cmd1 = (struct cmd*) malloc(sizeof(struct cmd));
+    mallocFail(cmd1);
 
     while (1) {
         char *nl;
         int retval;
-        char cmdCopy[CMDLINE_MAX];
+        char cmdcopy[CMDLINE_MAX];
 
         /* Print prompt */
         printf("sshell@ucd$ ");
@@ -101,32 +388,68 @@ int main(void)
 
         /* Remove trailing newline from command line */
         nl = strchr(cmd, '\n');
-        if (nl)
+        if (nl) {
             *nl = '\0';
+        }
 
         /* Parse command line */
-        parseCmd(strcpy(cmdCopy,cmd));
+        strcpy(cmdcopy,cmd);
+        int count = numCmds(cmdcopy);
+        if (count > 1) {
+            parsePipeline(cmd1, cmdcopy, count);
+        } else {
+            parseCmd(cmd1, cmdcopy);
+        }
+
+        if (cmd1->argv[0] == NULL) {
+            continue;
+        }
 
         /* Builtin command */
         // PWD
-        if (!strcmp(cmd1.type, "pwd")){
+        else if (!strcmp(cmd1->argv[0], "pwd")) {
             retval = pwdCmd();
-        }
+            printCompletionStatus(cmd, retval);
+            }
         // CD
-        else if (!strcmp(cmd1.type, "cd")){
-            retval = cdCmd();
+        else if (!strcmp(cmd1->argv[0], "cd")) {
+            retval = cdCmd(cmd1);
+            printCompletionStatus(cmd, retval);
+        }
+        else if (!strcmp(cmd1->argv[0], "pushd")) {
+            retval = pushdCmd(cmd1);
+            printCompletionStatus(cmd, retval);
+        }
+        else if (!strcmp(cmd1->argv[0], "popd")) {
+            retval = popdCmd();
+            printCompletionStatus(cmd, retval);
+        }
+        else if (!strcmp(cmd1->argv[0], "dirs")) {
+            retval = dirsCmd();
+            printCompletionStatus(cmd, retval);
         }
         // Exit
-        else if (!strcmp(cmd1.type, "exit")) {
+        else if (!strcmp(cmd1->argv[0], "exit")) {
             fprintf(stderr, "Bye...\n");
-            break;
+            fprintf(stderr, "+ completed '%s' [%d]\n", cmd, 0);
+            exit(0);
+        }
+        // Piping
+        else if (cmd1->next != NULL) {
+            int retvals[count];
+            pipeline(cmd1, count, retvals);
+            fprintf(stderr, "+ completed '%s' ", cmd);
+            for (int i = 0; i < count; i++) {
+                fprintf(stderr, "[%d]", retvals[i]);
+            }
+            fprintf(stderr, "\n");
         }
         /* Regular command */
-        else{
-            retval = execute();
+        else {
+            retval = execute(cmd1);
+            printCompletionStatus(cmd, retval);
         }
-        fprintf(stderr, "+ completed '%s' [%d]\n",
-                cmd, retval);
     }
+    freeMemory(cmd1);
     return EXIT_SUCCESS;
 }
