@@ -249,14 +249,14 @@ int outRedirection(char cmdString[], struct cmd *cmd)
 
     //Child process
     if ((pid = fork()) == 0) {
-        close(STDOUT_FILENO);
         int fdOut = open(filename, O_WRONLY | O_TRUNC | O_CREAT, 0644);
+        dup2(fdOut, STDOUT_FILENO);
         if (fdOut == -1) {
             fprintf(stderr, "Error: cannot open output file\n");
             return 1;
         }
-        execvp(cmd->argv[0], cmd->argv);
         close(fdOut);
+        execvp(cmd->argv[0], cmd->argv);
         fprintf(stderr, "Error: command not found");
         exit(1);
     } else if (pid > 0) { // Parent Process
@@ -288,14 +288,14 @@ int inRedirection(char cmdString[], struct cmd *cmd)
 
     //Child process
     if ((pid = fork()) == 0) {
-        close(STDIN_FILENO);
         int fdIn = open(filename, O_RDONLY);
+        dup2(fdIn, STDIN_FILENO);
         if (fdIn == -1) {
             fprintf(stderr, "Error: cannot open input file\n");
             return 1;
         }
-        execvp(cmd->argv[0], cmd->argv);
         close(fdIn);
+        execvp(cmd->argv[0], cmd->argv);
         fprintf(stderr, "Error: command not found");
         exit(1);
     } else if (pid > 0) { // Parent Process
