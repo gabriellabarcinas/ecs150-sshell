@@ -240,9 +240,7 @@ int outRedirection(char cmdString[], struct cmd *cmd)
 
     token = strtok(cmdString, delimiter);
     filename = strtok(NULL, " \t\r\n\v\f");
-
-    printf("%s\n", token);
-    if (iserror(token, filename)) {
+    if(iserror(token, filename)) {
         return 1;
     }
     parseCmd(cmd, token);
