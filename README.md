@@ -1,22 +1,19 @@
--------------------------
+
 PHASE 0: Preliminary work
 -------------------------
 
 During this phase, we worked on merely understanding the skeleton code in the C file provided and formed a plan to tackle each of the phases one by one. Additionally, we set up our makefile during this phase to generate the executable sshell.
 
---------------------------------
 PHASE 1: Running simple commands
 --------------------------------
 
 For this phase, we implemented simple commands utilizing the fork + executre + wait method from lecture. In this process, we simply fork() the parent process to create a child process that executes the command with execvp and waits for the return status of the child in the parent process. We chose to use execvp amongst the other exec functions in the family in order to automatically search programs in the $PATH. Additionally, we chose
 
-------------------
 PHASE 2: Arguments
 ------------------
 
 Foremost, we created a parsing function, void parsecmd(struct cmd* cmd, char cmdString[]), that parses the command line and stores the arguments into a struct. We utilized the strtok() library function to parse through each 'token' or argument of the command. We decided to use a this data structure because it allows for proper storage of command arguments which will be applicable and easy for keeping track of pipeline commands as well. 
 
--------------------------
 PHASE 3: Builtin commands
 -------------------------
 
@@ -27,13 +24,11 @@ To implement the builtin commands, we created seperate calling functions to excu
 
 For printing the working directory, we utilized the library function getcwd() as it retrieves the absolute pathname of the current working directory. Moreover, we utilizedd the chdir() library function to change the current working directory. These builtin commands, as well as all other commands, are closely paired with appropriate error management messeges. 
 
---------------------------
 PHASE 4: Ouput Redirection
 --------------------------
 
 TODO
 
---------------------------
 PHASE 5: Pipeline commands
 --------------------------
 
@@ -49,18 +44,13 @@ Moving from a two command pipeline to a multi command pipeline, we generalized t
     5. close shell fd's attached to shell
     6. wait for all child processes to return status via waitpid()
 
--------------------------
 PHASE 6: Extra feature(s)
 -------------------------
 
 TODO
 
--------
 TESTING
 -------
 
 We continuously tested our sshell while and after finishing each a phase. Utilizing the gdb debugger allowed us to solve segmentation faults and print values to ensure their correctness. We followed the given testing script as well.
 
-------------
-SOURCES USED
-------------
