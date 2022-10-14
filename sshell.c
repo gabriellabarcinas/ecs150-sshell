@@ -77,17 +77,18 @@ struct stack{
 struct stack* top = NULL;
 
 // Push directory into stack
-void push(char path){
-    struct stack *curr = malloc(sizeof(struct stack));
-    curr->directories = path;
+void push(char directory) {
+    struct stack *curr;
+    curr = malloc(sizeof(struct stack));
+    curr->directories = directory;
     if (top == NULL) {
         curr->next = NULL;
-    } else {
+    }
+    else {
         curr->next = top;
     }
     top = curr;
 }
-
 // Pop directory out of stack
 int pop() {
     struct stack *curr = top;
@@ -164,12 +165,12 @@ int pushdCmd(struct cmd *cmd) {
         perror("Error:");
     }
     else {
-        if (retval != 0) {
-            fprintf(stderr, "Error: no such directory\n");
+        if ( retval != 0) {
+            fprintf(stderr, "Error: cannot cd into directory\n");
             return EXIT_FAILURE;
         }
-        else {
-            push(cwd);
+        else{
+            push(*cwd);
         }
     }
     return retval;
@@ -198,74 +199,109 @@ int dirsCmd(){
 
     // Current directory starting first
     if (top == NULL) {
-        push(cwd);
+        push(*cwd);
         printf("%s\n", cwd);
-
     }
     else {
         struct stack *curr = top;
         while (curr->next != NULL) {
-            printf("%d/", curr->directories);
+            printf("%d\n", curr->directories);
             curr = curr->next;
         }
-        printf("%d/\n", curr->directories);
+        printf("%d\n", curr->directories);
     }
     return 0;
 }
 
+int iserror(char *cmd, char *filename) {
 
+    if (cmd == NULL) {
+        fprintf(stderr, "Error: missing command\n");
+        return 1;
+    } if (filename == NULL) {
+        fprintf(stderr, "Error: no output file\n");
+        return 1;
+    }
+
+    return 0;
+}
 
 // Output Redirection
-int outRedirection(char *fileName, struct cmd *cmd)
+int outRedirection(char cmdString[], struct cmd *cmd)
 {
+    const char delimiter[] = ">";
+    char *filename;
+    char *token;
+    int status;
     pid_t pid;
-    int fdOut;
-    pid = fork();
 
-    if (pid == 0) {
-        for (int i = 0; cmd->argv[i] != 0; i++) {
-            {
-                if ((!strcmp(cmd->argv[i], ">"))){
-                    close(STDOUT_FILENO);
-                    fdOut = open(fileName, O_CREAT | O_TRUNC | O_WRONLY, 0644);
-                    dup2(fdOut, STDOUT_FILENO);
-                    execvp(cmd->argv[0], cmd->argv);
-                    close(fdOut);
-                }
+    token = strtok(cmdString, delimiter);
+    filename = strtok(NULL, " \t\r\n\v\f");
 
-            }
-        }
+    printf("%s\n", token);
+    if(iserror(token, filename)) {
+        return 1;
     }
-    //fprintf(stderr, "Error: missing command");
-    //fprintf(stderr, "Error: no output file");
-    //fprintf(stderr, "Error: cannot open output file");
-    //fprintf(stderr, "Error: mislocated output redirection");
-    return 0;
+    parseCmd(cmd, token);
+
+    //Child process
+    if ((pid = fork()) == 0) {
+        close(STDOUT_FILENO);
+        int fdOut = open(filename, O_WRONLY | O_TRUNC | O_CREAT);
+        if (fdOut == -1) {
+            fprintf(stderr, "Error: cannot open output file\n");
+            return 1;
+        }
+        execvp(cmd->argv[0], cmd->argv);
+        close(fdOut);
+        fprintf(stderr, "Error: command not found");
+        exit(1);
+    } else if (pid > 0) { // Parent Process
+        waitpid(pid, &status, 0);
+    } else {
+        perror("fork failed");
+        exit(1);
+    }
+
+    return WEXITSTATUS(status);
 }
 
 
-int inRedirection(char *fileName, struct cmd *cmd) {
+int inRedirection(char cmdString[], struct cmd *cmd)
+{
+    const char delimiter[] = "<";
+    char *filename;
+    char *token;
+    int status;
     pid_t pid;
-    int fdIn;
-    pid = fork();
 
-    if (pid == 0) {
-        for (int i = 0; cmd->argv[i] != 0; i++) {
-            {
-                if ((!strcmp(cmd->argv[i], "<")))
-                    close(STDIN_FILENO);
-                    fdIn = open(fileName, O_CREAT | O_TRUNC | O_WRONLY, 0644);
-                    dup2(fdIn, STDIN_FILENO);
-                    execvp(cmd->argv[0], cmd->argv);
-                    close(fdIn);
-            }
-        }
+    token = strtok(cmdString, delimiter);
+    filename = strtok(NULL, " \t\r\n\v\f");
+    if(iserror(token, filename)) {
+        return 1;
     }
-        //execute(cmd->argv[1]);
-        //fprintf(stderr, "Error: no input file");
-        //fprintf(stderr, "Error: cannot open input file");
-        //fprintf(stderr, "Error: mislocated input redirection");
-    return 0;
+    parseCmd(cmd, token);
+
+    //Child process
+    if ((pid = fork()) == 0) {
+        close(STDIN_FILENO);
+        int fdIn = open(filename, O_RDONLY);
+        if (fdIn == -1) {
+            fprintf(stderr, "Error: cannot open input file\n");
+            return 1;
+        }
+        execvp(cmd->argv[0], cmd->argv);
+        close(fdIn);
+        fprintf(stderr, "Error: command not found");
+        exit(1);
+    } else if (pid > 0) { // Parent Process
+        waitpid(pid, &status, 0);
+    } else {
+        perror("fork failed");
+        exit(1);
+    }
+
+    return WEXITSTATUS(status);
 }
 
 void pipeline(struct cmd *cmd, int numcmds, int retvals[]) {
@@ -384,9 +420,22 @@ int main(void)
         /* Parse command line */
         strcpy(cmdcopy,cmd);
         int count = numCmds(cmdcopy);
-        if (count > 1) {
+        if (strchr(cmdcopy, '|')) {
             parsePipeline(cmd1, cmdcopy, count);
-        } else {
+        } else if (strchr(cmdcopy, '>')) {
+            retval = outRedirection(cmdcopy, cmd1);
+            if (retval != 1) {
+                printCompletionStatus(cmd, retval);
+            }
+            continue;
+        } else if (strchr(cmdcopy, '<')) {
+            retval = inRedirection(cmdcopy, cmd1);
+            if (retval != 1) {
+                printCompletionStatus(cmd, retval);
+            }
+            continue;
+        }
+        else {
             parseCmd(cmd1, cmdcopy);
         }
 
