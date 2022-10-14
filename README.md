@@ -48,10 +48,9 @@ PHASE 6: Extra feature(s)
 
 For Phase 6, we began by implementing a stack of struct by utilizing a linked list to help us with implementation of the builtin commands pushd, popd, and dirs that is used in the directory stack. We created two functions: push() and pop() to attain the results of pushing to a stack and popping from a stack. Along with creating the stack, we also utlized the library functions of getcwd(), which retrieves the current working directory, and chdir(), which changes the current working directory. For the three builtin commands, we created three seperate functions to implement each one; namely, pushCmd(), popdCmd(), and dirsCmd(). In each function we applied the appropriate library function of getcwd(), chdir(), or both to handle every test case as well as including relevant error management statements to handle errors.
 
-To implement input redirection, we mirrored the process of output redirection that took place Phase 4. For input redirection, 
+To implement input redirection, we mirrored the process of output redirection that took place Phase 4.
 
 TESTING
 -------
 
 We continuously tested our sshell while and after finishing each a phase. Utilizing the gdb debugger allowed us to solve segmentation faults and print values to ensure their correctness. We followed the given testing script as well.
-
