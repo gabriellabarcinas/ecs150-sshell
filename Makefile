@@ -1,11 +1,8 @@
-# Generate executable
-sshell: sshell.o
-    gcc -Wall -Wextra -Werror -o sshell sshell.o
+sshell : sshell.o
+	gcc -Wall -Werror -Wextra -o sshell sshell.o
 
-# Generate objects files from C files
-sshell.o: sshell.c
-    gcc -Wall -Wextra -Werror -c sshell.c
+sshell.o : sshell.c
+	gcc -Wall -Werror -Wextra -c sshell.c
 
-# Clean generated files
 clean:
-    rm -f sshell sshell.o
+	rm sshell sshell.o
