@@ -226,6 +226,8 @@ int iserror(char *cmd, char *filename) {
     return 0;
 }
 
+/* I/O Redirection */
+
 // Output Redirection
 int outRedirection(char cmdString[], struct cmd *cmd)
 {
@@ -239,7 +241,7 @@ int outRedirection(char cmdString[], struct cmd *cmd)
     filename = strtok(NULL, " \t\r\n\v\f");
 
     printf("%s\n", token);
-    if(iserror(token, filename)) {
+    if (iserror(token, filename)) {
         return 1;
     }
     parseCmd(cmd, token);
@@ -267,6 +269,7 @@ int outRedirection(char cmdString[], struct cmd *cmd)
 }
 
 
+// Input Redirection
 int inRedirection(char cmdString[], struct cmd *cmd)
 {
     const char delimiter[] = "<";
@@ -304,6 +307,7 @@ int inRedirection(char cmdString[], struct cmd *cmd)
     return WEXITSTATUS(status);
 }
 
+// Piping
 void pipeline(struct cmd *cmd, int numcmds, int retvals[]) {
     int numpipes = numcmds - 1;
     int fd[numpipes][2];
@@ -369,6 +373,7 @@ void freeMemory(struct cmd *ptr)
     }
 }
 
+// Count number of commands
 int numCmds(char argv[])
 {
     unsigned i, count = 0;
@@ -381,6 +386,7 @@ int numCmds(char argv[])
     return count + 1;
 }
 
+// Print completion status after execution
 void printCompletionStatus(char cmd[], int retval)
 {
     fprintf(stderr, "+ completed '%s' [%d]\n",
@@ -444,29 +450,32 @@ int main(void)
         }
 
         /* Builtin command */
-        // PWD
+        // pwd
         else if (!strcmp(cmd1->argv[0], "pwd")) {
             retval = pwdCmd();
             printCompletionStatus(cmd, retval);
             }
-        // CD
+        // cd
         else if (!strcmp(cmd1->argv[0], "cd")) {
             retval = cdCmd(cmd1);
             printCompletionStatus(cmd, retval);
         }
+        // pushd
         else if (!strcmp(cmd1->argv[0], "pushd")) {
             retval = pushdCmd(cmd1);
             printCompletionStatus(cmd, retval);
         }
+        // popd
         else if (!strcmp(cmd1->argv[0], "popd")) {
             retval = popdCmd();
             printCompletionStatus(cmd, retval);
         }
+        // dirs
         else if (!strcmp(cmd1->argv[0], "dirs")) {
             retval = dirsCmd();
             printCompletionStatus(cmd, retval);
         }
-        // Exit
+        // exit
         else if (!strcmp(cmd1->argv[0], "exit")) {
             fprintf(stderr, "Bye...\n");
             fprintf(stderr, "+ completed '%s' [%d]\n", cmd, 0);
