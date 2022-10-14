@@ -146,6 +146,7 @@ if (retval != 0) {
 return retval;
 }
 
+
 /* Directory Stack */
 
 // Builtin Command - (pushd)
@@ -169,6 +170,95 @@ int pushdCmd(struct cmd *cmd) {
         }
     }
     return retval;
+    
+int iserror(char *cmd, char *filename) {
+        
+        if (cmd == NULL) {
+                fprintf(stderr, "Error: missing command\n");
+                return 1;
+        } if (filename == NULL) {
+                fprintf(stderr, "Error: no output file\n");
+                return 1;
+        }
+
+        return 0;
+}
+// Output Redirection
+int outRedirection(char cmdString[], struct cmd *cmd)
+{
+        const char delimiter[] = ">";
+        char *filename;
+        char *token;
+        int status;
+        pid_t pid;
+
+        token = strtok(cmdString, delimiter);
+        filename = strtok(NULL, " \t\r\n\v\f");
+        
+        printf("%s\n", token);
+        if(iserror(token, filename)) {
+                return 1;
+        }
+        parsecmd(cmd, token);      
+
+        //Child process
+        if ((pid = fork()) == 0) {
+                close(STDOUT_FILENO);
+                int fdOut = open(filename, O_WRONLY);
+                if (fdOut == -1) {
+                        fprintf(stderr, "Error: cannot open output file\n");
+                        return 1;
+                }
+                execvp(cmd->argv[0], cmd->argv);
+                close(fdOut);
+                fprintf(stderr, "Error: command not found");
+                exit(1);
+        } else if (pid > 0) { // Parent Process
+                waitpid(pid, &status, 0);
+        } else {
+                perror("fork failed");
+                exit(1);
+        }
+
+        return WEXITSTATUS(status);
+}
+
+int inRedirection(char cmdString[], struct cmd *cmd) 
+{
+        const char delimiter[] = "<";
+        char *filename;
+        char *token;
+        int status;
+        pid_t pid;
+
+        token = strtok(cmdString, delimiter);
+        filename = strtok(NULL, " \t\r\n\v\f");
+        if(iserror(token, filename)) {
+                return 1;
+        }
+        parsecmd(cmd, token);      
+
+        //Child process
+        if ((pid = fork()) == 0) {
+                close(STDIN_FILENO);
+                int fdIn = open(filename, O_RDONLY);
+                if (fdIn == -1) {
+                        fprintf(stderr, "Error: cannot open input file\n");
+                        return 1;
+                }
+                execvp(cmd->argv[0], cmd->argv);
+                close(fdIn);
+                fprintf(stderr, "Error: command not found");
+                exit(1);
+        } else if (pid > 0) { // Parent Process
+                waitpid(pid, &status, 0);
+        } else {
+                perror("fork failed");
+                exit(1);
+        }
+
+        return WEXITSTATUS(status);
+
 }
 
 // Builtin Command - (popd)

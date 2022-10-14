@@ -27,7 +27,7 @@ For printing the working directory, we utilized the library function getcwd() as
 PHASE 4: Ouput Redirection
 --------------------------
 
-To implement output redirection, we first started with 
+To implement output redirection, we first started with parsing the command line on the '>' delimeter. From here we were able to utilize fork(), close(), open(), and exevp(), to redirect the output of the given command to the specified file instead of to stdout. 
 
 PHASE 5: Pipeline commands
 --------------------------
